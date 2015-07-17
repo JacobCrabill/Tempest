@@ -191,6 +191,10 @@ void solver::setupDualMesh(void) {
   v2e = Geo->v2e;
   v2v = Geo->v2v;
   Ae = Geo->e2A;
+  bcList = Geo->bcList;
+  bndNorm = Geo->bndNorm;
+  bndPts = Geo->bndPts;
+  nBndPts = Geo->nBndPts;
 
   // Solution at vertices
   U.setup(nVerts,nFields);
@@ -376,8 +380,22 @@ void solver::initializeSolution()
 {
   if (params->rank==0) cout << "Solver: Initializing Solution... " << flush;
 
+  for (uint i=0; i<nVerts; i++) {
+    switch (params->icType) {
+    case 0: // Uniform Flow
+      U(i,0) = params->rhoBound;
+      U(i,1) = params->rhoBound*params->uBound;
+      U(i,2) = params->rhoBound*params->vBound;
+      if (nDims == 3)
+        U(i,3) = params->rhoBound*params->wBound;
+      U(i,nDims+1) = params->pBound/(params->gamma-1) + 0.5*params->rhoBound*params->Uinf*params->Uinf;
+      break;
 
-  // loop...
+    case 1: // Isentropic Vortex test case
+      // Grab from HiFiLES or Flurry
+      break;
+    }
+  }
 
   /* If running a moving-mesh case and using CFL-based time-stepping,
    * calc initial dt for grid velocity calculation */
@@ -387,11 +405,18 @@ void solver::initializeSolution()
   if (params->dtType == 1) {
 
     double dt = INFINITY;
-//#pragma omp parallel for reduction(min:dt)
-//    for (uint i=0; i<eles.size(); i++) {
-//      eles[i].calcWaveSpFpts();
-//      dt = std::min(dt, eles[i].calcDt());
-//    }
+
+    #pragma omp parallel for reduction(min:dt)
+    for (int i=0; i<nVerts; i++) {
+      double rho = U(i,0);
+      double rhovMagSq = U(i,1)*U(i,1) + U(i,2)*U(i,2);
+      if (nDims == 3)
+        rhovMagSq += U(i,3)*U(i,3);
+      double p = (params->gamma-1)*U(i,nDims+1) - 0.5*rhovMagSq/rho;
+      double a = sqrt(max(params->gamma*p/rho,0));
+      //dx = ??;
+      dt = std::min(dt, params->CFL*dx/a);
+    }
 
 #ifndef _NO_MPI
   double dtTmp = dt;

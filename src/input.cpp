@@ -262,12 +262,6 @@ void input::readInputFile(char *filename)
     opts.getScalarValue("TBound",TBound,300.);
     opts.getScalarValue("TWall",TWall,300.);
     opts.getScalarValue("entropySensor",calcEntropySensor,false);
-    opts.getScalarValue("slipPenalty",slipPenalty,false);
-    if (slipPenalty) {
-     opts.getScalarValue("Kp",Kp);
-     opts.getScalarValue("Kd",Kd);
-     opts.getScalarValue("Ki",Ki);
-    }
     if (icType == 0) {
       opts.getScalarValue("rhoIC",rhoIC,rhoBound);
       opts.getScalarValue("vxIC",vxIC,uBound);
@@ -286,7 +280,6 @@ void input::readInputFile(char *filename)
 
   opts.getScalarValue("viscous",viscous,0);
   opts.getScalarValue("motion",motion,0);
-  opts.getScalarValue("order",order,3);
   opts.getScalarValue("riemannType",riemannType,0);
   opts.getScalarValue("testCase",test_case,0);
   opts.getScalarValue("iterMax",iterMax);
@@ -367,16 +360,6 @@ void input::readInputFile(char *filename)
   opts.getScalarValue("plotType",plotType,1);
   opts.getScalarValue("restart_freq",restart_freq,100);
   opts.getScalarValue("dataFileName",dataFileName,string("simData"));
-
-  opts.getScalarValue("spts_type_tri",sptsTypeTri,string("Legendre"));
-  opts.getScalarValue("spts_type_quad",sptsTypeQuad,string("Legendre"));
-  opts.getScalarValue("vcjhSchemeTri",vcjhSchemeTri,0);
-  opts.getScalarValue("vcjhSchemeQuad",vcjhSchemeQuad,0);
-
-  /* --- Shock Capturing --- */
-  opts.getScalarValue("shockCapture",scFlag,0);
-  if(scFlag == 1)
-    opts.getScalarValue("threshold",threshold,1.0);
 
   /* --- Cleanup ---- */
   opts.closeFile();

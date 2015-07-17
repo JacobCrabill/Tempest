@@ -479,41 +479,6 @@ void geo::processConnFaces(void)
     }
   }
 
-  /* --- Compute (Outward) Face Normals at All Boundary Faces --- */
-
-  // Outward face normal for each boundary face
-  matrixBase<Vec3,2> bcFaceNorm(nBounds,getMax(nBcFaces));
-
-  for (int bnd=0; bnd<nBounds; bnd++) {
-    for (int i=0; i<nBcFaces[bnd]; i++) {
-      int ff = bcFaceList[bnd][i];
-      switch (f2nv[ff]) {
-      case 3:
-        bcFaceNorm(bnd,i) = getFaceNormalTri(ff);
-        break;
-      case 4:
-        bcFaceNorm(bnd,i) = getFaceNormalQuad(ff);
-        break;
-      default:
-        FatalError("Number of face vertices not recognized.");
-      }
-    }
-  }
-
-  /* --- Computed Outward Normals for Each Boundary Point --- */
-
-  // Outward normals for each boundary point
-  bndNorm.setup(nBounds,getMax(nBndPts));
-
-  for (int bnd=0; bnd<nBounds; bnd++) {
-    for (int i=0; i<nBndPts[bnd]; i++) {
-      for (auto &bf: bcV2F(bnd,i)) {
-        bndNorm(bnd,i) += bcFaceNorm(bnd,bf);
-      }
-      bndNorm(bnd,i) /= bcv2nf(bnd,i);
-    }
-  }
-
   /* --- Setup Cell-To-Face, Face-To-Cell --- */
 
   c2f.setup(nEles,getMax(c2nf));
@@ -576,6 +541,41 @@ void geo::processConnFaces(void)
         c2c(ic,j) = f2c(ff,0);
       else
         c2c(ic,j) = f2c(ff,1);
+    }
+  }
+
+  /* --- Compute (Outward) Face Normals at All Boundary Faces --- */
+
+  // Outward face normal for each boundary face
+  matrixBase<Vec3,2> bcFaceNorm(nBounds,getMax(nBcFaces));
+
+  for (int bnd=0; bnd<nBounds; bnd++) {
+    for (int i=0; i<nBcFaces[bnd]; i++) {
+      int ff = bcFaceList[bnd][i];
+      switch (f2nv[ff]) {
+      case 3:
+        bcFaceNorm(bnd,i) = getFaceNormalTri(ff);
+        break;
+      case 4:
+        bcFaceNorm(bnd,i) = getFaceNormalQuad(ff);
+        break;
+      default:
+        FatalError("Number of face vertices not recognized.");
+      }
+    }
+  }
+
+  /* --- Computed Outward Normals for Each Boundary Point --- */
+
+  // Outward normals for each boundary point
+  bndNorm.setup(nBounds,getMax(nBndPts));
+
+  for (int bnd=0; bnd<nBounds; bnd++) {
+    for (int i=0; i<nBndPts[bnd]; i++) {
+      for (auto &bf: bcV2F(bnd,i)) {
+        bndNorm(bnd,i) += bcFaceNorm(bnd,bf);
+      }
+      bndNorm(bnd,i) /= bcv2nf(bnd,i);
     }
   }
 
