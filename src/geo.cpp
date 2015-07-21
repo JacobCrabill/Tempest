@@ -31,7 +31,7 @@
 
 geo::geo()
 {
-
+  nodesPerCell = NULL;
 }
 
 geo::~geo()
@@ -181,6 +181,14 @@ void geo::processConnEdges(void)
   // The number of times an edge appears in iE is equal to
   // the number of cells that edge touches
   vector<int> iE;
+  // First, organize all edges such that the lower vertex ID comes first
+  for (int ie=0; ie<e2v1.getDim0(); ie++) {
+    if (e2v1(ie,0) > e2v1(ie,1)) {
+      int tmp = e2v1(ie,1);
+      e2v1(ie,1) = e2v1(ie,0);
+      e2v1(ie,0) = tmp;
+    }
+  }
   e2v1.unique(e2v,iE);
   nEdges = e2v.getDim0();
 
@@ -218,10 +226,28 @@ void geo::processConnEdges(void)
     }
   }
 
-  /* --- Generate Internal and Boundary Face Lists --- */
-
   /* Flag for whether global face ID corresponds to interior or boundary face
      (note that, at this stage, MPI faces will be considered boundary faces) */
+
+  isBndEdge.assign(nEdges,0);
+  for (int ie=0; ie<nEdges; ie++) {
+    bool found = false;
+    for (int ib=0; ib<nBounds; ib++) {
+      if (findFirst(bndPts[ib],e2v(ie,0),nBndPts[ib]) != -1) {
+        for (int ib=0; ib<nBounds; ib++) {
+          if (findFirst(bndPts[ib],e2v(ie,1),nBndPts[ib]) != -1) {
+            isBndEdge[ie] = 1;
+            found = true;
+            break;
+          }
+        }
+
+        if (found) break;
+      }
+    }
+  }
+
+  /* --- Get maximum number of cells per edge --- */
 
   int maxCPerE = 0;
   for (uint i=0; i<iE.size(); i++) {
@@ -233,11 +259,6 @@ void geo::processConnEdges(void)
       vecAssign(iE,ie,-1);
     }
   }
-
-  /* --- Setup MPI Processor Boundary Faces --- */
-#ifndef _NO_MPI
-  matchMPIFaces();
-#endif
 
   /* --- Setup Cell-To-Edge, Edge-To-Cell --- */
 
@@ -308,7 +329,7 @@ void geo::processConnEdges(void)
 
     // Next, match each cell edge with the global edge list
     for (int j=0; j<c2ne[e]; j++) {
-      if (e2v1(j,1) < e2v1(j,1)) {
+      if (e2v1(j,1) < e2v1(j,0)) {
         // Swap nodes so that lower node always first
         int tmp = e2v1(j,1);
         e2v1(j,1) = e2v1(j,0);
@@ -321,7 +342,7 @@ void geo::processConnEdges(void)
       int ie0 = ie1[ie2];
 
       // Find ID of face within type-specific array
-      if (isBnd[ie0]) {
+      if (isBndEdge[ie0]) {
         c2e(e,j) = ie0;
         c2b(e,j) = 1;
       }else{
@@ -354,17 +375,24 @@ void geo::processConnFaces(void)
   ct2fv[HEX].insertRow(vector<int>{3,2,6,7});  // Back
   ct2fnv[HEX] = {4,4,4,4,4,4};
 
-  ct2fv[HEX].insertRow(vector<int>{0,1,2});    // Bottom
-  ct2fv[HEX].insertRow(vector<int>{3,4,5});    // Top
-  ct2fv[HEX].insertRow(vector<int>{0,1,4,3});
-  ct2fv[HEX].insertRow(vector<int>{0,3,5,2});
-  ct2fv[HEX].insertRow(vector<int>{1,2,5,4});
+  ct2fv[PRISM].insertRowUnsized(vector<int>{0,1,2});    // Bottom
+  ct2fv[PRISM].insertRowUnsized(vector<int>{3,4,5});    // Top
+  ct2fv[PRISM].insertRowUnsized(vector<int>{0,1,4,3});
+  ct2fv[PRISM].insertRowUnsized(vector<int>{0,3,5,2});
+  ct2fv[PRISM].insertRowUnsized(vector<int>{1,2,5,4});
   ct2fnv[PRISM] = {3,3,4,4,4};
 
-  ct2fv[TET].insertRow(vector<int>{0,1,2});
-  ct2fv[TET].insertRow(vector<int>{1,0,3});
-  ct2fv[TET].insertRow(vector<int>{2,1,3});
-  ct2fv[TET].insertRow(vector<int>{0,2,3});
+  ct2fv[PYRAMID].insertRowUnsized(vector<int>{0,1,2,3});    // Bottom
+  ct2fv[PYRAMID].insertRowUnsized(vector<int>{0,1,4});    // Top
+  ct2fv[PYRAMID].insertRowUnsized(vector<int>{1,2,4});
+  ct2fv[PYRAMID].insertRowUnsized(vector<int>{2,3,4});
+  ct2fv[PYRAMID].insertRowUnsized(vector<int>{3,0,4});
+  ct2fnv[PYRAMID] = {4,3,3,3,3};
+
+  ct2fv[TET].insertRowUnsized(vector<int>{0,1,2});
+  ct2fv[TET].insertRowUnsized(vector<int>{1,0,3});
+  ct2fv[TET].insertRowUnsized(vector<int>{2,1,3});
+  ct2fv[TET].insertRowUnsized(vector<int>{0,2,3});
   ct2fnv[TET] = {3,3,3,3};
 
   for (int e=0; e<nEles; e++) {
@@ -486,6 +514,7 @@ void geo::processConnFaces(void)
   c2c.setup(nEles,getMax(c2nf));
   c2b.initializeToZero();
   c2c.initializeToValue(-1);
+  c2nc.assign(nEles,0);
   f2c.setup(nFaces,2);
   f2c.initializeToValue(-1);  
 
@@ -537,10 +566,13 @@ void geo::processConnFaces(void)
   for (int ic=0; ic<nEles; ic++) {
     for (int j=0; j<c2nf[ic]; j++) {
       int ff = c2f(ic,j);
-      if (f2c(ff,0) != ic)
-        c2c(ic,j) = f2c(ff,0);
-      else
-        c2c(ic,j) = f2c(ff,1);
+      if (ff >= 0) {
+        if (f2c(ff,0) != ic)
+          c2c(ic,j) = f2c(ff,0);
+        else
+          c2c(ic,j) = f2c(ff,1);
+        c2nc[ic]++;
+      }
     }
   }
 
@@ -643,6 +675,9 @@ Vec3 geo::getFaceNormalQuad(int faceID)
 
 void geo::processConnDual(void)
 {
+  /* --- Finish Cell-To-Cell Connectivity --- */
+
+
 
   /* --- Setup Dual Mesh Faces --- */
 
@@ -662,7 +697,7 @@ void geo::processConnDual(void)
       for (int k=0; k<c2nf[ic]; k++) {
         int ic2 = c2c(ic,k);
         // see if this c2c is another cell for this edge
-        if (ic2>ic && findFirst(e2c[i],ic2,c2nc[i]) != -1) {
+        if (ic2>ic && findFirst(e2c[i],ic2,e2nc[i]) != -1) {
           dualEdges(nmatched,0) = ic;
           dualEdges(nmatched,1) = ic2;
           nmatched++;
@@ -675,8 +710,8 @@ void geo::processConnDual(void)
     for (int j=0; j<e2nc[i]; j++) {
       Vec3 dx1 = c2xc[dualEdges(j,0)] - midPt;
       Vec3 dx2 = c2xc[dualEdges(j,1)] - midPt;
-      Vec3 A = dx1.cross(dx2);
-      e2A[i] = A.norm();
+      Vec3 A = dx1.cross(dx2)/2.;
+      e2A[i] += A.norm();
     }
   }
 
@@ -688,17 +723,18 @@ void geo::processConnDual(void)
     point vert = point(xv[iv]);
 
     // Sum up contributions from each dual tetrahedron around each edge
-    for (int ie=0; ie<v2nv[ie]; ie++) {
+    for (int j=0; j<v2nv[iv]; j++) {
+      int ie = v2e(iv,j);
       // Get the 'edges' of the dual-mesh face
       matrix<int> dualEdges(e2nc[ie],2); // each 'edge' of the dual face (neighboring cell IDs)
       int nmatched = 0;
-      for (int j=0; j<e2nc[ie]; j++) {
-        int ic = e2c(ie,j);
+      for (int k=0; k<e2nc[ie]; k++) {
+        int ic = e2c(ie,k);
         // To find dual edge, find cells adjacent to current cell which also share mesh edge
         for (int k=0; k<c2nf[ic]; k++) {
           int ic2 = c2c(ic,k);
           // see if this c2c is another cell for this edge
-          if (ic2>ic && findFirst(e2c[ie],ic2,c2nc[ie]) != -1) {
+          if (ic2>ic && findFirst(e2c[ie],ic2,e2nc[ie]) != -1) {
             dualEdges(nmatched,0) = ic;
             dualEdges(nmatched,1) = ic2;
             nmatched++;
@@ -709,12 +745,12 @@ void geo::processConnDual(void)
       // Have the dual-mesh-face edges; get the dual-tet volumes
       // http://mathworld.wolfram.com/Tetrahedron.html
 
-      point midPt = (point(xv[e2v(iv,0)])+point(xv[e2v(iv,1)]))/2.;
-      Vec3 a = midPt - point(xv[iv]);
+      point midPt = (point(xv[e2v(ie,0)])+point(xv[e2v(ie,1)]))/2.;
+      Vec3 a = midPt - vert;
 
-      for (int j=0; j<e2nc[ie]; j++) {
-        Vec3 b = c2xc[dualEdges(j,0)] - vert;
-        Vec3 c = c2xc[dualEdges(j,1)] - vert;
+      for (int k=0; k<e2nc[ie]; k++) {
+        Vec3 b = c2xc[dualEdges(k,0)] - vert;
+        Vec3 c = c2xc[dualEdges(k,1)] - vert;
         Vec3 bc = b.cross(c);
         double vol = std::abs(a*bc)/6.;
         v2vol[iv] += vol;
@@ -724,19 +760,19 @@ void geo::processConnDual(void)
 
   /* --- Get Boundary-Point Normals ---- */
 
-  for (int bnd=0; bnd<nBounds; bnd++) {
-    for (int i=0; i<nBndPts[bnd]; bnd++) {
-      int iv = bndPts(bnd,i);
-      set<int> bpts;
-      for (int j=0; j<v2nv[iv]; j++) {
-        if (v2b[v2v(iv,j)]) {
-          bpts.insert(v2v(iv,j));
-        }
-      }
+//  for (int bnd=0; bnd<nBounds; bnd++) {
+//    for (int i=0; i<nBndPts[bnd]; i++) {
+//      int iv = bndPts(bnd,i);
+//      set<int> bpts;
+//      for (int j=0; j<v2nv[iv]; j++) {
+//        if (v2b[v2v(iv,j)]) {
+//          bpts.insert(v2v(iv,j));
+//        }
+//      }
 
-      // Have the surrounding points in random order; now
-    }
-  }
+//      // Have the surrounding points in random order; now
+//    }
+//  }
 }
 
 //void geo::registerGridDataTIOGA(void)
@@ -1294,14 +1330,14 @@ void geo::readGmsh(string fileName)
       }
 
       // Increase the size of c2v (max # of vertices per cell) if needed
-      if (c2v.getDim1()<(uint)c2nv[ic]) {
-        for (int dim=c2v.getDim1(); dim<c2nv[ic]; dim++) {
-          c2v.addCol();
-        }
-      }
+//      if (c2v.getDim1()<(uint)c2nv[ic]) {
+//        for (int dim=c2v.getDim1(); dim<c2nv[ic]; dim++) {
+//          c2v.addCol();
+//        }
+//      }
 
       // Number of nodes in c2v_tmp may vary, so use pointer rather than vector
-      c2v.insertRow(c2v_tmp.data(),-1,c2nv[ic]);
+      c2v.insertRowUnsized(c2v_tmp.data(),c2nv[ic]);
 
       // Shift every value of c2v by -1 (Gmsh is 1-indexed; we need 0-indexed)
       for(int k=0; k<c2nv[ic]; k++) {
@@ -1447,6 +1483,8 @@ void geo::createMesh()
     c2nv.assign(nEles,8);
     c2nf.assign(nEles,6);
     ctype.assign(nEles,HEX);
+
+    c2ne.assign(nEles,12);
 
     /* --- Setup Vertices --- */
 
@@ -1654,12 +1692,12 @@ void geo::createMesh()
 
   // Remove duplicates in bndPts
   for (int i=0; i<nBounds; i++) {
-    std::sort(bndPts[i], bndPts[i]+bndPts.dim1);
-    int* it = std::unique(bndPts[i], bndPts[i]+bndPts.dim1);
+    std::sort(bndPts[i], bndPts[i]+bndPts.getDim1());
+    int* it = std::unique(bndPts[i], bndPts[i]+bndPts.getDim1());
     nBndPts[i] = std::distance(bndPts[i],it);
   }
   int maxNBndPts = getMax(nBndPts);
-  bndPts.removeCols(bndPts.dim1-maxNBndPts);
+  bndPts.removeCols(bndPts.getDim1()-maxNBndPts);
 }
 
 void geo::processPeriodicBoundaries(void)

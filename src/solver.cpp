@@ -19,6 +19,7 @@
 #include <omp.h>
 
 #include "input.hpp"
+#include "flux.hpp"
 #include "geo.hpp"
 
 solver::solver()
@@ -83,6 +84,11 @@ void solver::setup(input *params, geo *Geo)
   }
 
   F.setup(nEdges,nDims,nFields);
+
+  tempFL.setup(nDims,nFields);
+  tempFR.setup(nDims,nFields);
+
+  waveSp.resize(nEdges);
 
   divF.setup(nRKSteps,nVerts,nFields);
 
@@ -154,12 +160,12 @@ void solver::calcResidual(int step)
   doCommunication();
 #endif
 
+  applyBoundaryConditions();
+
   if (params->viscous)
     calcGradU();
 
   calcInviscidFlux();
-
-  applyBoundaryConditions();
 
 #ifndef _NO_MPI
   calcInviscidFlux_mpi();
@@ -191,6 +197,7 @@ void solver::setupDualMesh(void) {
   v2e = Geo->v2e;
   v2v = Geo->v2v;
   Ae = Geo->e2A;
+  vol = Geo->v2vol;
   bcList = Geo->bcList;
   bndNorm = Geo->bndNorm;
   bndPts = Geo->bndPts;
@@ -201,12 +208,19 @@ void solver::setupDualMesh(void) {
 
   // Flux at faces
   F.setup(nEdges,nFields);
+  Fn.setup(nEdges,nFields);
 
   // Dual-mesh face areas
   A.setup(nVerts,getMax(v2ne));
+  normDir.setup(nVerts,getMax(v2ne));
+  normDir.initializeToValue(1);
   for (int i=0; i<nVerts; i++) {
     for (int j=0; j<v2ne[i]; j++) {
       A(i,j) = Ae[v2e(i,j)];
+      if (i == Geo->e2v(v2e(i,j),1)) {
+        // This node is on "right" of edge, so "flip the normal"
+        normDir(i,j) = -1;
+      }
     }
   }
 }
@@ -219,7 +233,61 @@ void solver::finishMpiSetup(void)
 
 void solver::calcInviscidFlux(void)
 {
+#pragma omp parallel for
+  for (int i=0; i<nEdges; i++) {
+    int ivL = Geo->e2v(i,0);
+    int ivR = Geo->e2v(i,1);
 
+    inviscidFlux(U[ivL],tempFL,params);
+    inviscidFlux(U[ivR],tempFR,params);
+
+    double tempFnL[5] = {0,0,0,0,0};
+    double tempFnR[5] = {0,0,0,0,0};
+
+    // Get primitive variables
+    double rhoL = U(ivL,0);     double rhoR = U(ivR,0);
+    double uL = U(ivL,1)/rhoL;  double uR = U(ivR,1)/rhoR;
+    double vL = U(ivL,2)/rhoL;  double vR = U(ivR,2)/rhoR;
+
+    double wL, pL, vnL=0.;
+    double wR, pR, vnR=0.;
+
+    // Calculate pressure
+    if (params->nDims==2) {
+      pL = (params->gamma-1.0)*(U(ivL,3)-rhoL*(uL*uL+vL*vL));
+      pR = (params->gamma-1.0)*(U(ivR,3)-rhoR*(uR*uR+vR*vR));
+    }
+    else {
+      wL = U(ivL,3)/rhoL;   wR = U(ivR,3)/rhoR;
+      pL = (params->gamma-1.0)*(U(ivL,4)-rhoL*(uL*uL+vL*vL+wL*wL));
+      pR = (params->gamma-1.0)*(U(ivR,4)-rhoR*(uR*uR+vR*vR+wR*wR));
+    }
+
+    // Get normal fluxes, normal velocities
+    Vec3 norm = point(xv[ivR]) - point(xv[ivL]);
+    norm /= norm.norm();
+
+    for (int dim=0; dim<params->nDims; dim++) {
+      vnL += norm[dim]*U(ivL,dim+1)/rhoL;
+      vnR += norm[dim]*U(ivR,dim+1)/rhoR;
+      for (int i=0; i<params->nFields; i++) {
+        tempFnL[i] += norm[dim]*tempFL(dim,i);
+        tempFnR[i] += norm[dim]*tempFR(dim,i);
+      }
+    }
+
+    // Get maximum eigenvalue for diffusion coefficient
+    double csqL = max(params->gamma*pL/rhoL,0.0);
+    double csqR = max(params->gamma*pR/rhoR,0.0);
+    double eigL = std::fabs(vnL) + sqrt(csqL);
+    double eigR = std::fabs(vnR) + sqrt(csqR);
+    waveSp[i] = max(eigL,eigR);
+
+    // Calculate Rusanov flux
+    for (int k=0; k<params->nFields; k++) {
+      Fn(i,k) = 0.5*(tempFnL[k]+tempFnR[k] - waveSp[i]*(U(ivR,k)-U(ivL,k)));
+    }
+  }
 }
 
 void solver::doCommunication()
@@ -247,18 +315,12 @@ void solver::calcFluxDivergence(int step)
 {
 #pragma omp parallel for
   for (int i=0; i<nVerts; i++) {
-    for (int k=0; k<nFields; k++) divF(step,i,k) = 0;
+    if (!Geo->v2b[i]) {
+      for (int k=0; k<nFields; k++) divF(step,i,k) = 0;
 
-    for (int j=0; j<v2ne[i]; j++) {
-      // Get properly-scaled normal vector
-      int iv2 = v2v(i,j);
-      Vec3 norm = point(xv[iv2]) - point(xv[i]);
-      norm.norm();
-      norm *= A(i,j);
-
-      for (int k=0; k<nFields; k++) {
-        for (int dim=0; dim<nDims; dim++) {
-          divF(step,i,k) += F(v2e(i,j),dim,k)*norm[dim];
+      for (int j=0; j<v2ne[i]; j++) {
+        for (int k=0; k<nFields; k++) {
+          divF(step,i,k) += Fn(v2e(i,j),k)*A(i,j)*normDir(i,j);
         }
       }
     }
@@ -282,19 +344,33 @@ void solver::moveMesh(int step)
 
 void solver::calcDt(void)
 {
-//  double dt = INFINITY;
+  double dt = INFINITY;
 
-//#pragma omp parallel for reduction(min:dt)
-//  for (uint i=0; i<eles.size(); i++) {
-//    dt = min(dt, eles[i].calcDt());
-//  }
+#pragma omp parallel for reduction(min:dt)
+  for (int i=0; i<nVerts; i++) {
+    if (Geo->v2b[i]) continue;
 
-//#ifndef _NO_MPI
-//  double dtTmp = dt;
-//  MPI_Allreduce(&dtTmp, &dt, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-//#endif
+    double rho = U(i,0);
+    double rhovMagSq = U(i,1)*U(i,1) + U(i,2)*U(i,2);
+    if (nDims == 3)
+      rhovMagSq += U(i,3)*U(i,3);
+    double p = (params->gamma-1)*U(i,nDims+1) - 0.5*rhovMagSq/rho;
+    double a = sqrt(max(params->gamma*p/rho,0.));
 
-//  params->dt = dt;
+    double minA = INFINITY;
+    for (int j=0; j<v2ne[i]; j++)
+      minA = min(minA,A(i,j));
+    double dx = vol[i]/minA;
+
+    dt = std::min(dt, params->CFL*dx/a);
+  }
+
+#ifndef _NO_MPI
+double dtTmp = dt;
+MPI_Allreduce(&dtTmp, &dt, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+#endif
+
+  params->dt = dt;
 }
 
 
@@ -302,6 +378,7 @@ void solver::timeStepA(int step)
 {
 #pragma omp parallel for
   for (int i=0; i<nVerts; i++) {
+    if (Geo->v2b[i]) continue;
     for (int j=0; j<nFields; j++) {
       U(i,j) = U0(i,j) - RKa[step]*params->dt*divF(step,i,j)/vol[i];
     }
@@ -313,6 +390,7 @@ void solver::timeStepB(int step)
 {
 #pragma omp parallel for
   for (int i=0; i<nVerts; i++) {
+    if (Geo->v2b[i]) continue;
     for (int j=0; j<nFields; j++) {
       U(i,j) -= RKb[step]*params->dt*divF(step,i,j)/vol[i];
     }
@@ -402,29 +480,8 @@ void solver::initializeSolution()
   /* If running a moving-mesh case and using CFL-based time-stepping,
    * calc initial dt for grid velocity calculation */
   //if ( (params->motion!=0 || params->slipPenalty==1) && params->dtType == 1 ) {
-  if (params->dtType == 1) {
-
-    double dt = INFINITY;
-
-    #pragma omp parallel for reduction(min:dt)
-    for (int i=0; i<nVerts; i++) {
-      double rho = U(i,0);
-      double rhovMagSq = U(i,1)*U(i,1) + U(i,2)*U(i,2);
-      if (nDims == 3)
-        rhovMagSq += U(i,3)*U(i,3);
-      double p = (params->gamma-1)*U(i,nDims+1) - 0.5*rhovMagSq/rho;
-      double a = sqrt(max(params->gamma*p/rho,0));
-      //dx = ??;
-      dt = std::min(dt, params->CFL*dx/a);
-    }
-
-#ifndef _NO_MPI
-  double dtTmp = dt;
-  MPI_Allreduce(&dtTmp, &dt, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-#endif
-
-    params->dt = dt;
-  }
+  if (params->dtType == 1)
+    calcDt();
 
   if (params->rank == 0) cout << "done." << endl;
 }

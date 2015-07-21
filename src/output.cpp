@@ -30,7 +30,7 @@ void writeData(solver *Solver, input *params)
     writeCSV(Solver,params);
   }
   else if (params->plotType == 1) {
-    writeParaview(Solver,params);
+    writeParaview(Solver,Solver->Geo,params);
   }
 
 }
@@ -107,399 +107,308 @@ void writeCSV(solver *Solver, input *params)
 //  dataFile.close();
 }
 
-void writeParaview(solver *Solver, input *params)
+void writeParaview(solver *Solver, geo* Geo, input *params)
 {
-//  ofstream dataFile;
-//  int iter = params->iter;
+  ofstream dataFile;
+  int iter = params->iter;
 
-//  char fileNameC[100];
-//  string fileName = params->dataFileName;
+  char fileNameC[100];
+  string fileName = params->dataFileName;
 
-//#ifndef _NO_MPI
-//  /* --- All processors write their solution to their own .vtu file --- */
-//  sprintf(fileNameC,"%s_%.09d/%s_%.09d_%d.vtu",&fileName[0],iter,&fileName[0],iter,params->rank);
-//#else
-//  /* --- Filename to write to --- */
-//  sprintf(fileNameC,"%s_%.09d.vtu",&fileName[0],iter);
-//#endif
+#ifndef _NO_MPI
+  /* --- All processors write their solution to their own .vtu file --- */
+  sprintf(fileNameC,"%s_%.09d/%s_%.09d_%d.vtu",&fileName[0],iter,&fileName[0],iter,params->rank);
+#else
+  /* --- Filename to write to --- */
+  sprintf(fileNameC,"%s_%.09d.vtu",&fileName[0],iter);
+#endif
 
-//  if (params->rank == 0)
-//    cout << "Writing ParaView file " << string(fileNameC) << "...  " << flush;
+  if (params->rank == 0)
+    cout << "Writing ParaView file " << string(fileNameC) << "...  " << flush;
 
-//#ifndef _NO_MPI
-//  /* --- Write 'master' .pvtu file --- */
-//  if (params->rank == 0) {
-//    ofstream pVTU;
-//    char pvtuC[100];
-//    sprintf(pvtuC,"%s_%.09d.pvtu",&fileName[0],iter);
+#ifndef _NO_MPI
+  /* --- Write 'master' .pvtu file --- */
+  if (params->rank == 0) {
+    ofstream pVTU;
+    char pvtuC[100];
+    sprintf(pvtuC,"%s_%.09d.pvtu",&fileName[0],iter);
 
-//    pVTU.open(pvtuC);
+    pVTU.open(pvtuC);
 
-//    pVTU << "<?xml version=\"1.0\" ?>" << endl;
-//    pVTU << "<VTKFile type=\"PUnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << endl;
-//    pVTU << "  <PUnstructuredGrid GhostLevel=\"1\">" << endl;
-//    // NOTE: Must be careful with order here [particularly of vector data], or else ParaView gets confused
-//    pVTU << "    <PPointData Scalars=\"Density\" Vectors=\"Velocity\" >" << endl;
-//    pVTU << "      <PDataArray type=\"Float32\" Name=\"Density\" />" << endl;
-//    if (params->equation == NAVIER_STOKES) {
-//      pVTU << "      <PDataArray type=\"Float32\" Name=\"Velocity\" NumberOfComponents=\"3\" />" << endl;
-//      pVTU << "      <PDataArray type=\"Float32\" Name=\"Pressure\" />" << endl;
-//      if (params->calcEntropySensor) {
-//        pVTU << "      <PDataArray type=\"Float32\" Name=\"EntropyErr\" />" << endl;
-//      }
-//      if (params->motion) {
-//        pVTU << "      <PDataArray type=\"Float32\" Name=\"GridVelocity\" NumberOfComponents=\"3\" />" << endl;
-//      }
-//    }
-//    pVTU << "    </PPointData>" << endl;
-//    pVTU << "    <PPoints>" << endl;
-//    pVTU << "      <PDataArray type=\"Float32\" Name=\"Points\" NumberOfComponents=\"3\" />" << endl;
-//    pVTU << "    </PPoints>" << endl;
+    pVTU << "<?xml version=\"1.0\" ?>" << endl;
+    pVTU << "<VTKFile type=\"PUnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << endl;
+    pVTU << "  <PUnstructuredGrid GhostLevel=\"1\">" << endl;
+    // NOTE: Must be careful with order here [particularly of vector data], or else ParaView gets confused
+    pVTU << "    <PPointData Scalars=\"Density\" Vectors=\"Velocity\" >" << endl;
+    pVTU << "      <PDataArray type=\"Float32\" Name=\"Density\" />" << endl;
+    if (params->equation == NAVIER_STOKES) {
+      pVTU << "      <PDataArray type=\"Float32\" Name=\"Velocity\" NumberOfComponents=\"3\" />" << endl;
+      pVTU << "      <PDataArray type=\"Float32\" Name=\"Pressure\" />" << endl;
+      if (params->calcEntropySensor) {
+        pVTU << "      <PDataArray type=\"Float32\" Name=\"EntropyErr\" />" << endl;
+      }
+      if (params->motion) {
+        pVTU << "      <PDataArray type=\"Float32\" Name=\"GridVelocity\" NumberOfComponents=\"3\" />" << endl;
+      }
+    }
+    pVTU << "    </PPointData>" << endl;
+    pVTU << "    <PPoints>" << endl;
+    pVTU << "      <PDataArray type=\"Float32\" Name=\"Points\" NumberOfComponents=\"3\" />" << endl;
+    pVTU << "    </PPoints>" << endl;
 
-//    char filnameTmpC[100];
-//    for (int p=0; p<params->nproc; p++) {
-//      sprintf(filnameTmpC,"%s_%.09d/%s_%.09d_%d.vtu",&fileName[0],iter,&fileName[0],iter,p);
-//      pVTU << "    <Piece Source=\"" << string(filnameTmpC) << "\" />" << endl;
-//    }
-//    pVTU << "  </PUnstructuredGrid>" << endl;
-//    pVTU << "</VTKFile>" << endl;
+    char filnameTmpC[100];
+    for (int p=0; p<params->nproc; p++) {
+      sprintf(filnameTmpC,"%s_%.09d/%s_%.09d_%d.vtu",&fileName[0],iter,&fileName[0],iter,p);
+      pVTU << "    <Piece Source=\"" << string(filnameTmpC) << "\" />" << endl;
+    }
+    pVTU << "  </PUnstructuredGrid>" << endl;
+    pVTU << "</VTKFile>" << endl;
 
-//    pVTU.close();
+    pVTU.close();
 
-//    char datadirC[100];
-//    char *datadir = &datadirC[0];
-//    sprintf(datadirC,"%s_%.09d",&fileName[0],iter);
+    char datadirC[100];
+    char *datadir = &datadirC[0];
+    sprintf(datadirC,"%s_%.09d",&fileName[0],iter);
 
-//    /* --- Master node creates a subdirectory to store .vtu files --- */
-//    if (params->rank == 0) {
-//      struct stat st = {0};
-//      if (stat(datadir, &st) == -1) {
-//        mkdir(datadir, 0755);
-//      }
-//    }
-//  }
+    /* --- Master node creates a subdirectory to store .vtu files --- */
+    if (params->rank == 0) {
+      struct stat st = {0};
+      if (stat(datadir, &st) == -1) {
+        mkdir(datadir, 0755);
+      }
+    }
+  }
 
-//  /* --- Wait for all processes to get here, otherwise there won't be a
-//   *     directory to put .vtus into --- */
-//  MPI_Barrier(MPI_COMM_WORLD);
-//#endif
+  /* --- Wait for all processes to get here, otherwise there won't be a
+   *     directory to put .vtus into --- */
+  MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
-//  dataFile.open(fileNameC);
-//  dataFile.precision(16);
+  dataFile.open(fileNameC);
+  dataFile.precision(16);
 
-//  // File header
-//  dataFile << "<?xml version=\"1.0\" ?>" << endl;
-//  dataFile << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << endl;
-//  dataFile << "	<UnstructuredGrid>" << endl;
-
-//  // If this is the initial file, need to extrapolate solution to flux points
-//  if (params->iter==params->initIter) Solver->extrapolateU();
-
-//  Solver->extrapolateUMpts();
-
-//  if (params->equation == NAVIER_STOKES) {
-//    if (params->calcEntropySensor)
-//      Solver->calcEntropyErr_spts();
-//    Solver->extrapolateSFpts();
-//    Solver->extrapolateSMpts();
-//  }
-
-//  for (auto& e:Solver->eles) {
-//    if (params->motion != 0) {
-//      e.updatePosSpts();
-//      e.updatePosFpts();
-//      e.setPpts();
-//    }
-
-//    // The combination of spts + fpts will be the plot points
-//    matrix<double> vPpts, gridVelPpts, errPpts;
-//    vector<point> ppts;
-//    e.getPrimitivesPlot(vPpts);
-//    if (params->motion)
-//      e.getGridVelPlot(gridVelPpts);
-//    ppts = e.getPpts();
-
-//    // Shock Capturing stuff
-//    double sensor;
-//    if(params->scFlag == 1) {
-//      sensor = e.getSensor();
-//    }
-
-//    if (params->equation == NAVIER_STOKES && params->calcEntropySensor)
-//      e.getEntropyErrPlot(errPpts);
-
-//    int nSubCells, nPpts;
-//    int nPpts1D = e.order+3;
-//    if (params->nDims == 2) {
-//      nSubCells = (e.order+2)*(e.order+2);
-//      nPpts = (e.order+3)*(e.order+3);
-//    }
-//    else if (params->nDims == 3) {
-//      nSubCells = (e.order+2)*(e.order+2)*(e.order+2);
-//      nPpts = (e.order+3)*(e.order+3)*(e.order+3);
-//    }
-//    else
-//      FatalError("Invalid dimensionality [nDims].");
-
-//    // Write cell header
-//    dataFile << "		<Piece NumberOfPoints=\"" << nPpts << "\" NumberOfCells=\"" << nSubCells << "\">" << endl;
-
-//    /* ==== Write out solution to file ==== */
-
-//    dataFile << "			<PointData>" << endl;
-
-//    /* --- Density --- */
-//    dataFile << "				<DataArray type=\"Float32\" Name=\"Density\" format=\"ascii\">" << endl;
-//    for(int k=0; k<nPpts; k++) {
-//      dataFile << vPpts(k,0) << " ";
-//    }
-//    dataFile << endl;
-//    dataFile << "				</DataArray>" << endl;
-
-//    if(params->scFlag == 1){
-//      /* --- Shock Sensor --- */
-//      dataFile << "				<DataArray type=\"Float32\" Name=\"Sensor\" format=\"ascii\">" << endl;
-//      for(int k=0; k<nPpts; k++) {
-//        dataFile << sensor << " ";
-//      }
-//      dataFile << endl;
-//      dataFile << "				</DataArray>" << endl;
-//    }
+  // File header
+  dataFile << "<?xml version=\"1.0\" ?>" << endl;
+  dataFile << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\" compressor=\"vtkZLibDataCompressor\">" << endl;
+  dataFile << "	<UnstructuredGrid>" << endl;
 
 
-//    if (params->equation == NAVIER_STOKES) {
-//      /* --- Velocity --- */
-//      dataFile << "				<DataArray type=\"Float32\" NumberOfComponents=\"3\" Name=\"Velocity\" format=\"ascii\">" << endl;
-//      for(int k=0; k<nPpts; k++) {
-//        dataFile << vPpts(k,1) << " " << vPpts(k,2) << " ";
+  // Write cell header
+  dataFile << "		<Piece NumberOfPoints=\"" << Geo->nVerts << "\" NumberOfCells=\"" << Geo->nEles << "\">" << endl;
 
-//        // In 2D the z-component of velocity is not stored, but Paraview needs it so write a 0.
-//        if(params->nDims==2) {
-//          dataFile << 0.0 << " ";
-//        }
-//        else {
-//          dataFile << vPpts(k,3) << " ";
-//        }
-//      }
-//      dataFile << endl;
-//      dataFile << "				</DataArray>" << endl;
+  /* ==== Write out solution to file ==== */
 
-//      /* --- Pressure --- */
-//      dataFile << "				<DataArray type=\"Float32\" Name=\"Pressure\" format=\"ascii\">" << endl;
-//      for(int k=0; k<nPpts; k++) {
-//        dataFile << vPpts(k,params->nDims+1) << " ";
-//      }
-//      dataFile << endl;
-//      dataFile << "				</DataArray>" << endl;
+  dataFile << "			<PointData>" << endl;
 
-//      if (params->motion) {
-//        /* --- Grid Velocity --- */
-//        dataFile << "				<DataArray type=\"Float32\" NumberOfComponents=\"3\" Name=\"GridVelocity\" format=\"ascii\">" << endl;
-//        for(int k=0; k<nPpts; k++) {
-//          // Divide momentum components by density to obtain velocity components
-//          dataFile << gridVelPpts(k,0) << " " << gridVelPpts(k,1) << " ";
+  /* --- Density --- */
+  dataFile << "				<DataArray type=\"Float32\" Name=\"Density\" format=\"ascii\">" << endl;
+  for(int i=0; i<Geo->nVerts; i++) {
+    dataFile << Solver->U(i,0) << " ";
+  }
+  dataFile << endl;
+  dataFile << "				</DataArray>" << endl;
 
-//          // In 2D the z-component of velocity is not stored, but Paraview needs it so write a 0.
-//          if(params->nDims==2) {
-//            dataFile << 0.0 << " ";
-//          }
-//          else {
-//            dataFile << gridVelPpts(k,2) << " ";
-//          }
-//        }
-//        dataFile << endl;
-//        dataFile << "				</DataArray>" << endl;
-//      }
-//    }
+  if (params->equation == NAVIER_STOKES) {
+    /* --- Velocity --- */
+    dataFile << "				<DataArray type=\"Float32\" NumberOfComponents=\"3\" Name=\"Momentum\" format=\"ascii\">" << endl;
+    for(int i=0; i<Solver->nVerts; i++) {
+      dataFile << Solver->U(i,1) << " " << Solver->U(i,2) << " " << Solver->U(i,3) << " ";
+    }
+    dataFile << endl;
+    dataFile << "				</DataArray>" << endl;
 
-//    if (params->equation == NAVIER_STOKES && params->calcEntropySensor) {
-//      /* --- Entropy Error Estimate --- */
-//      dataFile << "				<DataArray type=\"Float32\" Name=\"EntropyErr\" format=\"ascii\">" << endl;
-//      for(int k=0; k<nPpts; k++) {
-//        dataFile << std::abs(errPpts(k)) << " ";
-//      }
-//      dataFile << endl;
-//      dataFile << "				</DataArray>" << endl;
-//    }
+    /* --- Pressure --- */
+    dataFile << "				<DataArray type=\"Float32\" Name=\"Energy\" format=\"ascii\">" << endl;
+    for(int i=0; i<Solver->nVerts; i++) {
+      dataFile << Solver->U(i,params->nDims+1) << " ";
+    }
+    dataFile << endl;
+    dataFile << "				</DataArray>" << endl;
+  }
 
-//    /* --- End of Cell's Solution Data --- */
+  //    if (params->equation == NAVIER_STOKES && params->calcEntropySensor) {
+  //      /* --- Entropy Error Estimate --- */
+  //      dataFile << "				<DataArray type=\"Float32\" Name=\"EntropyErr\" format=\"ascii\">" << endl;
+  //      for(int k=0; k<nPpts; k++) {
+  //        dataFile << std::abs(errPpts(k)) << " ";
+  //      }
+  //      dataFile << endl;
+  //      dataFile << "				</DataArray>" << endl;
+  //    }
 
-//    dataFile << "			</PointData>" << endl;
+  /* --- End of Cell's Solution Data --- */
 
-//    /* ==== Write Out Cell Points & Connectivity==== */
+  dataFile << "			</PointData>" << endl;
 
-//    /* --- Write out the plot point coordinates --- */
-//    dataFile << "			<Points>" << endl;
-//    dataFile << "				<DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">" << endl;
+  /* ==== Write Out Cell Points & Connectivity==== */
 
-//    // Loop over plot points in element
-//    for(int k=0; k<nPpts; k++) {
-//      for(int l=0;l<params->nDims;l++) {
-//        dataFile << ppts[k][l] << " ";
-//      }
+  /* --- Write out the plot point coordinates --- */
+  dataFile << "			<Points>" << endl;
+  dataFile << "				<DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">" << endl;
 
-//      // If 2D, write a 0 as the z-component
-//      if(params->nDims == 2) {
-//        dataFile << "0 ";
-//      }
-//    }
+  // Loop over plot points in element
+  for(int i=0; i<Solver->nVerts; i++) {
+    for(int j=0;j<params->nDims;j++) {
+      dataFile << Geo->xv(i,j) << " ";
+    }
+  }
 
-//    dataFile << endl;
-//    dataFile << "				</DataArray>" << endl;
-//    dataFile << "			</Points>" << endl;
+  dataFile << endl;
+  dataFile << "				</DataArray>" << endl;
+  dataFile << "			</Points>" << endl;
 
-//    /* --- Write out Cell data: connectivity, offsets, element types --- */
-//    dataFile << "			<Cells>" << endl;
+  /* --- Write out Cell data: connectivity, offsets, element types --- */
+  dataFile << "			<Cells>" << endl;
 
-//    /* --- Write connectivity array --- */
-//    dataFile << "				<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">" << endl;
+  /* --- Write connectivity array --- */
+  dataFile << "				<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">" << endl;
 
-//    if (params->nDims == 2) {
-//      for (int j=0; j<nPpts1D-1; j++) {
-//        for (int i=0; i<nPpts1D-1; i++) {
-//          dataFile << j*nPpts1D     + i   << " ";
-//          dataFile << j*nPpts1D     + i+1 << " ";
-//          dataFile << (j+1)*nPpts1D + i+1 << " ";
-//          dataFile << (j+1)*nPpts1D + i   << " ";
-//          dataFile << endl;
-//        }
-//      }
-//    }
-//    else if (params->nDims == 3) {
-//      for (int k=0; k<nPpts1D-1; k++) {
-//        for (int j=0; j<nPpts1D-1; j++) {
-//          for (int i=0; i<nPpts1D-1; i++) {
-//            dataFile << i   + nPpts1D*(j   + nPpts1D*k) << " ";
-//            dataFile << i+1 + nPpts1D*(j   + nPpts1D*k) << " ";
-//            dataFile << i+1 + nPpts1D*(j+1 + nPpts1D*k) << " ";
-//            dataFile << i   + nPpts1D*(j+1 + nPpts1D*k) << " ";
+  for (int i=0; i<Geo->nEles; i++) {
+    for (int j=0; j<Geo->c2nv[i]; j++) {
+      dataFile << Geo->c2v(i,j) << " ";
+    }
+    dataFile << endl;
+  }
+  dataFile << "				</DataArray>" << endl;
 
-//            dataFile << i   + nPpts1D*(j   + nPpts1D*(k+1)) << " ";
-//            dataFile << i+1 + nPpts1D*(j   + nPpts1D*(k+1)) << " ";
-//            dataFile << i+1 + nPpts1D*(j+1 + nPpts1D*(k+1)) << " ";
-//            dataFile << i   + nPpts1D*(j+1 + nPpts1D*(k+1)) << " ";
+  // Write cell-node offsets
 
-//            dataFile << endl;
-//          }
-//        }
-//      }
-//    }
-//    dataFile << "				</DataArray>" << endl;
+  dataFile << "				<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">" << endl;
 
-//    // Write cell-node offsets
-//    int nvPerCell;
-//    if (params->nDims == 2) nvPerCell = 4;
-//    else                    nvPerCell = 8;
-//    dataFile << "				<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">" << endl;
-//    for(int k=0; k<nSubCells; k++){
-//      dataFile << (k+1)*nvPerCell << " ";
-//    }
-//    dataFile << endl;
-//    dataFile << "				</DataArray>" << endl;
+  int offset = 0;
+  for (int i=0; i<Geo->nEles; i++) {
+    offset += Geo->c2nv[i];
+    dataFile << offset << " ";
+  }
+  dataFile << endl;
 
-//    // Write VTK element type
-//    // 5 = tri, 9 = quad, 10 = tet, 12 = hex
-//    int eType;
-//    if (params->nDims == 2) eType = 9;
-//    else                    eType = 12;
-//    dataFile << "				<DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">" << endl;
-//    for(int k=0; k<nSubCells; k++) {
-//      dataFile << eType << " ";
-//    }
-//    dataFile << endl;
-//    dataFile << "				</DataArray>" << endl;
+  dataFile << "				</DataArray>" << endl;
 
-//    /* --- Write cell and piece footers --- */
-//    dataFile << "			</Cells>" << endl;
-//    dataFile << "		</Piece>" << endl;
-//  }
+  // Write VTK element type
+  // 5 = tri, 9 = quad, 10 = tet, 12 = hex
+  map<int,int> et2et;
+  et2et[TRI]     = 5;
+  et2et[QUAD]    = 9;
+  et2et[TET]     = 10;
+  et2et[HEX]     = 12;
+  et2et[PRISM]   = 13;
+  et2et[PYRAMID] = 14;
 
-//  /* --- Write footer of file & close --- */
-//  dataFile << "	</UnstructuredGrid>" << endl;
-//  dataFile << "</VTKFile>" << endl;
+  dataFile << "				<DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">" << endl;
+  for(int i=0; i<Geo->nEles; i++) {
+    dataFile << et2et[Geo->ctype[i]] << " ";
+  }
+  dataFile << endl;
+  dataFile << "				</DataArray>" << endl;
 
-//  dataFile.close();
+  /* --- Write cell and piece footers --- */
+  dataFile << "			</Cells>" << endl;
+  dataFile << "		</Piece>" << endl;
 
-//  if (params->rank == 0) cout << "done." <<  endl;
+  /* --- Write footer of file & close --- */
+  dataFile << "	</UnstructuredGrid>" << endl;
+  dataFile << "</VTKFile>" << endl;
+
+  dataFile.close();
+
+  if (params->rank == 0) cout << "done." <<  endl;
 }
 
 
 void writeResidual(solver *Solver, input *params)
 {
-//  vector<double> res(params->nFields);
-//  int iter = params->iter;
+  vector<double> res(params->nFields);
+  int iter = params->iter;
 
-//  if (params->resType == 3) {
-//    // Infinity Norm
-//#pragma omp parallel for
-//    for (uint e=0; e<Solver->eles.size(); e++) {
-//      auto resTmp = Solver->eles[e].getNormResidual(params->resType);
-//      if(checkNaN(resTmp)) FatalError("NaN Encountered in Solution Residual!");
+  if (params->resType == 3) {
+    // Infinity Norm
+#pragma omp parallel for
+    for (uint iv=0; iv<Solver->nVerts; iv++) {
+      if (Solver->Geo->v2b[iv]) continue;
+      for (int i=0; i<params->nFields; i++) {
+        double resTmp = Solver->U(iv,0) / Solver->vol[iv];
+        if(std::isnan(resTmp)) FatalError("NaN Encountered in Solution Residual!");
 
-//      for (int i=0; i<params->nFields; i++)
-//        res[i] = max(res[i],resTmp[i]);
-//    }
-//  }
-//  else if (params->resType == 1 || params->resType == 2) {
-//    // 1-Norm or 2-Norm
-//#pragma omp parallel for
-//    for (uint e=0; e<Solver->eles.size(); e++) {
-//      auto resTmp = Solver->eles[e].getNormResidual(params->resType);
-//      if(checkNaN(resTmp)) FatalError("NaN Encountered in Solution Residual!");
+        res[i] = max(res[i],resTmp);
+      }
+    }
+  }
+  else if (params->resType == 1) {
+    // 1-Norm
+#pragma omp parallel for
+    for (uint iv=0; iv<Solver->nVerts; iv++) {
+      if (Solver->Geo->v2b[iv]) continue;
+      for (int i=0; i<params->nFields; i++) {
+        double resTmp = Solver->U(iv,0) / Solver->vol[iv];
+        if(std::isnan(resTmp)) FatalError("NaN Encountered in Solution Residual!");
 
-//      for (int i=0; i<params->nFields; i++)
-//        res[i] += resTmp[i];
-//    }
-//  }
+        res[i] += resTmp;
+      }
+    }
+  }
+  else if (params->resType == 2) {
+    // 2-Norm
+#pragma omp parallel for
+    for (uint iv=0; iv<Solver->nVerts; iv++) {
+      if (Solver->Geo->v2b[iv]) continue;
+      for (int i=0; i<params->nFields; i++) {
+        double resTmp = Solver->U(iv,0) / Solver->vol[iv];
+        resTmp *= resTmp;
+        if(std::isnan(resTmp)) FatalError("NaN Encountered in Solution Residual!");
 
-//#ifndef _NO_MPI
-//  if (params->nproc > 1) {
-//    if (params->resType == 3) {
-//      vector<double> resTmp = res;
-//      MPI_Reduce(resTmp.data(), res.data(), params->nFields, MPI_DOUBLE, MPI_MAX, 0,MPI_COMM_WORLD);
-//    }
-//    else if (params->resType == 1 || params->resType == 2) {
-//      vector<double> resTmp = res;
-//      MPI_Reduce(resTmp.data(), res.data(), params->nFields, MPI_DOUBLE, MPI_SUM, 0,MPI_COMM_WORLD);
-//    }
-//  }
-//#endif
+        res[i] += resTmp;
+      }
+    }
+  }
 
-//  // If taking 2-norm, res is sum squared; take sqrt to complete
-//  if (params->rank == 0) {
-//    if (params->resType == 2) {
-//      for (auto& R:res) R = sqrt(R);
-//    }
+#ifndef _NO_MPI
+  if (params->nproc > 1) {
+    if (params->resType == 3) {
+      vector<double> resTmp = res;
+      MPI_Reduce(resTmp.data(), res.data(), params->nFields, MPI_DOUBLE, MPI_MAX, 0,MPI_COMM_WORLD);
+    }
+    else if (params->resType == 1 || params->resType == 2) {
+      vector<double> resTmp = res;
+      MPI_Reduce(resTmp.data(), res.data(), params->nFields, MPI_DOUBLE, MPI_SUM, 0,MPI_COMM_WORLD);
+    }
+  }
+#endif
 
-//    int colW = 16;
-//    cout.precision(6);
-//    cout.setf(ios::scientific, ios::floatfield);
-//    if (iter==1 || (iter/params->monitorResFreq)%25==0) {
-//      cout << endl;
-//      cout << setw(8) << left << "Iter";
-//      if (params->equation == ADVECTION_DIFFUSION) {
-//        cout << " Residual " << endl;
-//      }else if (params->equation == NAVIER_STOKES) {
-//        cout << setw(colW) << left << "rho";
-//        cout << setw(colW) << left << "rhoU";
-//        cout << setw(colW) << left << "rhoV";
-//        if (params->nDims == 3)
-//          cout << setw(colW) << left << "rhoW";
-//        cout << setw(colW) << left << "rhoE";
-//        if (params->dtType == 1)
-//          cout << setw(colW) << left << "deltaT";
-//      }
-//      cout << endl;
-//    }
+  // If taking 2-norm, res is sum squared; take sqrt to complete
+  if (params->rank == 0) {
+    if (params->resType == 2) {
+      for (auto& R:res) R = sqrt(R);
+    }
 
-//    cout << setw(8) << left << iter;
-//    for (int i=0; i<params->nFields; i++) {
-//      cout << setw(colW) << left << res[i];
-//    }
-//    if (params->dtType == 1)
-//      cout << setw(colW) << left << params->dt;
-//    cout << endl;
-//  }
+    int colW = 16;
+    cout.precision(6);
+    cout.setf(ios::scientific, ios::floatfield);
+    if (iter==1 || (iter/params->monitorResFreq)%25==0) {
+      cout << endl;
+      cout << setw(8) << left << "Iter";
+      if (params->equation == ADVECTION_DIFFUSION) {
+        cout << " Residual " << endl;
+      }else if (params->equation == NAVIER_STOKES) {
+        cout << setw(colW) << left << "rho";
+        cout << setw(colW) << left << "rhoU";
+        cout << setw(colW) << left << "rhoV";
+        if (params->nDims == 3)
+          cout << setw(colW) << left << "rhoW";
+        cout << setw(colW) << left << "rhoE";
+        if (params->dtType == 1)
+          cout << setw(colW) << left << "deltaT";
+      }
+      cout << endl;
+    }
+
+    cout << setw(8) << left << iter;
+    for (int i=0; i<params->nFields; i++) {
+      cout << setw(colW) << left << res[i];
+    }
+    if (params->dtType == 1)
+      cout << setw(colW) << left << params->dt;
+    cout << endl;
+  }
 }
 
 void writeMeshTecplot(solver* Solver, input* params)

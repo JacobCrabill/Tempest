@@ -68,8 +68,8 @@ void matrixBase<T,N>::setup(uint inDim0, uint inDim1, uint inDim2, uint inDim3)
 template<typename T, uint N>
 T* matrixBase<T,N>::operator[](int inRow)
 {
-  if (inRow < (int)dim0 && inRow >= 0) {
-    return &data[inRow*dim1];
+  if (inRow < (int)this->dims[0] && inRow >= 0) {
+    return &data[inRow*dims[1]];
   }
   else {
     FatalError("Attempted out-of-bounds access in matrix.");
@@ -79,11 +79,13 @@ T* matrixBase<T,N>::operator[](int inRow)
 template<typename T, uint N>
 T& matrixBase<T,N>::operator()(int i, int j, int k, int l)
 {
-  if (i<(int)dim0 && i>=0 && j<(int)dim1 && j>=0) {
+  if (i<(int)this->dims[0] && i>=0 && j<(int)this->dims[1] && j>=0 &&
+      k<(int)this->dims[2] && k>=0 && l<(int)this->dims[3] && l>= 0)
+  {
     return data[l+dims[3]*(k+dims[2]*(j+dims[1]*i))];
   }
   else {
-    cout << "i=" << i << ", dim0=" << dims[0] << ", j=" << j << ", dim1=" << dims[1];
+    cout << "i=" << i << ", dim0=" << dims[0] << ", j=" << j << ", dim1=" << dims[1] << ", ";
     cout << "k=" << k << ", dim2=" << dims[2] << ", l=" << l << ", dim3=" << dims[3] << endl;
     FatalError("Attempted out-of-bounds access in Array.");
   }
@@ -138,7 +140,8 @@ void matrix<T>::initializeToValue(T val)
 template<typename T>
 void matrix<T>::insertRow(const vector<T> &vec, int rowNum)
 {
-  if (this->dims[1]!= 0 && vec.size()!=this->dims[1]) FatalError("Attempting to assign row of wrong size to matrix.");
+  if (this->dims[1]!= 0 && vec.size()!=this->dims[1])
+    FatalError("Attempting to assign row of wrong size to matrix.");
 
   if (rowNum==INSERT_AT_END || rowNum==(int)this->dims[0]) {
     // Default action - add to end
@@ -153,9 +156,10 @@ void matrix<T>::insertRow(const vector<T> &vec, int rowNum)
 }
 
 template<typename T>
-void matrix<T>::insertRow(T *vec, int rowNum, int length)
+void matrix<T>::insertRow(T *vec, uint rowNum, uint length)
 {
-  if (this->dims[1]!=0 && length!=(int)this->dims[1]) FatalError("Attempting to assign row of wrong size to matrix.");
+  if (this->dims[1]!=0 && length!=(int)this->dims[1])
+    FatalError("Attempting to assign row of wrong size to matrix.");
 
   if (rowNum==INSERT_AT_END || rowNum==(int)this->dims[0]) {
     // Default action - add to end
@@ -165,7 +169,9 @@ void matrix<T>::insertRow(T *vec, int rowNum, int length)
     this->data.insert(this->data.begin()+rowNum*this->dims[1],vec,vec+length);
   }
 
-  if (this->dims[1]==0) this->dims[1]=length;
+  if (this->dims[0]==0)
+    this->dims = {0,length,1,1};
+
   this->dims[0]++;
 }
 
@@ -177,6 +183,23 @@ void matrix<T>::insertRowUnsized(const vector<T> &vec)
   if (vec.size() > this->dims[1]) addCols(vec.size()-this->dims[1]);
 
   this->data.insert(this->data.end(),vec.begin(),vec.end());
+
+  // If row too short, finish filling with 0's
+  if (vec.size() < this->dims[1]) this->data.insert(this->data.end(),this->dims[1]-vec.size(),(T)0);
+
+  this->dims[0]++;
+}
+
+template<typename T>
+void matrix<T>::insertRowUnsized(T* vec, int length)
+{
+  // Add row to end, and resize matrix (add columns) if needed
+  if (length > this->dims[1]) addCols(length-this->dims[1]);
+
+  this->data.insert(this->data.end(),vec,vec+length);
+
+  // If row too short, finish filling with 0's
+  if (length < this->dims[1]) this->data.insert(this->data.end(),this->dims[1]-length,(T)0);
 
   this->dims[0]++;
 }

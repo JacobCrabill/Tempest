@@ -25,7 +25,7 @@ void writeData(solver *Solver, input *params);
 void writeCSV(solver *Solver, input *params);
 
 /*! Write solution data to a Paraview .vtu file. */
-void writeParaview(solver *Solver, input *params);
+void writeParaview(solver *Solver, geo* Geo, input *params);
 
 /*! Compute the residual and print to the screen. */
 void writeResidual(solver *Solver, input *params);

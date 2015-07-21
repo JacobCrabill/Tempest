@@ -97,7 +97,7 @@ public:
   vector<int> intFaces, bndFaces, mpiFaces, mpiCells;
   vector<int> nBcFaces;          //! Number of faces on each boundary
   vector<vector<int>> bcFaceList; //! Global face IDs of faces on each boundary
-  matrixBase<Vec3,2> bndNorm;         //! Outward unit normal for each boundary point
+  Array<Vec3,2> bndNorm;         //! Outward unit normal for each boundary point
   vector<point> c2xc;            //! Centroid of each cell in mesh (for creation of dual mesh)
   vector<int> bcList;            //! List of boundary conditions for each boundary
   vector<int> bcTypeF;           //! Boundary condition for each boundary face
@@ -112,6 +112,7 @@ public:
   vector<int> mpiLocF;           //! Element-local face ID of MPI Face in left cell
   vector<int> mpiLocF_R;         //! Element-local face ID of MPI Face in right cell
   vector<bool> isBnd; // might want to change this to "int" and have it store WHICH boundary the face is on (-1 for internal)
+  vector<int> isBndEdge;         //! For each edge, flag for "normal" or "boundary"
 
   /* --- Overset-Related Variables --- */
   int nprocPerGrid;       //! Number of MPI processes assigned to each (overset) grid block

@@ -55,10 +55,10 @@ public:
   matrixBase<T,N> operator=(const matrixBase<T,N>& inMatrix);
 
   /*! Get dim0 [number of rows] */
-  uint getDim0(void) {return dim0;}
+  uint getDim0(void) {return this->dims[0];}
 
   /*! Get dim1 [number of columns] */
-  uint getDim1(void) {return dim1;}
+  uint getDim1(void) {return this->dims[1];}
 
   /*! Get the size of the underlying data array (total number of matrix elements) */
   uint getSize(void) {return data.size();}
@@ -84,7 +84,7 @@ public:
   /* --- Search Operations --- */
 
   /* --- Member Variables --- */
-  uint dim0, dim1;
+  //uint dim0, dim1;
   uint nDims;
   array<uint,4> dims;  //! Dimensions of the matrix
 
@@ -120,7 +120,9 @@ public:
 
   void insertRowUnsized(const vector<T> &vec);
 
-  void insertRow(T* vec, int rowNum, int length);
+  void insertRow(T* vec, uint rowNum, uint length);
+
+  void insertRowUnsized(T* vec, int length);
 
   //! Remove columns from the end of the matrix
   void removeCols(int nCols = 1);

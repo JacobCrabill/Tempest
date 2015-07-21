@@ -142,7 +142,7 @@ public:
   //! Perform the overset data interpolation using TIOGA high-order
   void callDataUpdateTIOGA();
 
-private:
+//private:
   //! Pointer to the parameters object for the current solution
   input *params;
 
@@ -167,14 +167,19 @@ private:
 
   matrix<double> U;    //! Global solution array for solver (at vertices)
   matrix<double> U0;   //! Global solution array at beginning of RK step
-  matrix<double> A;    //! Area of dual-mesh faces around each vertex
+  matrix<double> A;    //! Area of dual-mesh faces around each vertex 
   vector<double> vol;  //! Volume of dual-mesh elements
-  Array<double,3> F;    //! Global flux array for solver (at edges)
-  Array<double,3> divF; //! Divergence of flux (at vertices) (for each RK step)
+  Array<double,3> F;   //! Global flux array for solver (at edges)
+  matrix<double> Fn;   //! Global normal flux array for solver (at edges)
+  Array<double,3> divF;  //! Divergence of flux (at vertices) (for each RK step)
   Array<double,3> gradU; //! Gradient of solution (at vertices)
+  vector<double> waveSp; //! Wave speed at each edge
+
+  matrix<double> tempFL, tempFR;
 
   matrix<double> xv;   //! Coordinates of each vertex
 
+  matrix<int> normDir; //! Direction of normal flux for each each around each vertex (+1 or -1)
   vector<double> Ae;   //! Face area for all dual-mesh faces
   vector<int> v2ne;    //! Number of edges (or dual-mesh faces) for each vertex
   matrix<int> v2e;     //! Vertex to edge connectivity
