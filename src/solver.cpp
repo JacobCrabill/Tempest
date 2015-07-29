@@ -200,6 +200,7 @@ void solver::setupDualMesh(void) {
   vol = Geo->v2vol;
   bcList = Geo->bcList;
   bndNorm = Geo->bndNorm;
+  bndArea = Geo->bndArea;
   bndPts = Geo->bndPts;
   nBndPts = Geo->nBndPts;
 
@@ -321,6 +322,20 @@ void solver::calcFluxDivergence(int step)
     for (int j=0; j<v2ne[i]; j++) {
       for (int k=0; k<nFields; k++) {
         divF(step,i,k) += Fn(v2e(i,j),k)*A(i,j)*normDir(i,j);
+      }
+    }
+  }
+
+  matrix<double> tmpF(nDims,nFields);
+#pragma omp parallel for collapse(2)
+  for (int ib=0; ib<nBounds; ib++) {
+    for (int i=0; i<nBndPts[ib]; i++) {
+      int iv = bndPts(ib,i);
+      inviscidFlux(U[iv],tmpF,params);
+      for (int dim=0; dim<nDims; dim++) {
+        for (int k=0; k<nFields; k++) {
+          divF(step,iv,k) += tmpF(dim,k)*bndNorm(ib,i)[dim]*bndArea(ib,i);
+        }
       }
     }
   }

@@ -516,7 +516,7 @@ void geo::processConnFaces(void)
   c2c.initializeToValue(-1);
   c2nc.assign(nEles,0);
   f2c.setup(nFaces,2);
-  f2c.initializeToValue(-1);  
+  f2c.initializeToValue(-1);
 
   for (int ic=0; ic<nEles; ic++) {
     for (int j=0; j<c2nf[ic]; j++) {
@@ -597,17 +597,20 @@ void geo::processConnFaces(void)
     }
   }
 
-  /* --- Computed Outward Normals for Each Boundary Point --- */
+  /* --- Compute Outward Normals for Each Boundary Point --- */
 
   // Outward normals for each boundary point
   bndNorm.setup(nBounds,getMax(nBndPts));
+  bndArea.setup(nBounds,getMax(nBndPts));
 
   for (int bnd=0; bnd<nBounds; bnd++) {
     for (int i=0; i<nBndPts[bnd]; i++) {
       for (auto &bf: bcV2F(bnd,i)) {
+        bndArea(bnd,i) += bcFaceNorm(bnd,bf).norm();
         bndNorm(bnd,i) += bcFaceNorm(bnd,bf);
       }
-      bndNorm(bnd,i) /= bcv2nf(bnd,i);
+      // Normalize based upon total area
+      bndNorm(bnd,i) /= bndArea(bnd,i);
     }
   }
 
@@ -629,11 +632,11 @@ Vec3 geo::getFaceNormalTri(int faceID)
   Vec3 dxc = c2xc[f2c(faceID,0)] - (pt0+pt1+pt2)/3.;  // Face centroid to cell centroid
   if (norm*dxc > 0) {
     // Face normal is pointing into cell; flip
-    norm /= -norm.norm();
+    norm *= -1;
   }
   else {
     // Face normal is pointing out of cell; keep direction
-    norm /= norm.norm();
+    //norm /= norm.norm();
   }
 
   return norm;
@@ -675,10 +678,6 @@ Vec3 geo::getFaceNormalQuad(int faceID)
 
 void geo::processConnDual(void)
 {
-  /* --- Finish Cell-To-Cell Connectivity --- */
-
-
-
   /* --- Setup Dual Mesh Faces --- */
 
   e2A.resize(nEdges);

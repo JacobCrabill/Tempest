@@ -80,7 +80,7 @@ public:
 
   int nDims, nFields;
   int nEles, nVerts, nEdges, nFaces, nIntFaces, nBndFaces, nMpiFaces;
-  int nBounds;  //! Number of boundaries  
+  int nBounds;  //! Number of boundaries
   int meshType;
 
   // Basic [essential] Connectivity Data
@@ -98,6 +98,7 @@ public:
   vector<int> nBcFaces;          //! Number of faces on each boundary
   vector<vector<int>> bcFaceList; //! Global face IDs of faces on each boundary
   Array<Vec3,2> bndNorm;         //! Outward unit normal for each boundary point
+  matrix<double> bndArea;        //! Face area for each boundary point
   vector<point> c2xc;            //! Centroid of each cell in mesh (for creation of dual mesh)
   vector<int> bcList;            //! List of boundary conditions for each boundary
   vector<int> bcTypeF;           //! Boundary condition for each boundary face
