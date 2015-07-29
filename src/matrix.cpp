@@ -20,14 +20,14 @@ template<typename T, uint N>
 matrixBase<T,N>::matrixBase()
 {
   data.resize(0);
-  dims = {0,0,0,0};
+  dims = {{0,0,0,0}};
 }
 
 template<typename T, uint N>
 matrixBase<T,N>::matrixBase(uint inDim0, uint inDim1, uint inDim2, uint inDim3)
 {
   data.resize(inDim0*inDim1*inDim2*inDim3);
-  dims = {inDim0,inDim1,inDim2,inDim3};
+  dims = {{inDim0,inDim1,inDim2,inDim3}};
 }
 
 template<typename T>
@@ -40,7 +40,7 @@ template<typename T>
 matrix<T>::matrix(uint inDim0, uint inDim1)
 {
   this->data.resize(inDim0*inDim1);
-  this->dims = {inDim0,inDim1,1,1};
+  this->dims = {{inDim0,inDim1,1,1}};
 }
 
 template<typename T, uint N>
@@ -61,7 +61,7 @@ matrixBase<T,N> matrixBase<T,N>::operator=(const matrixBase<T,N> &inMatrix)
 template<typename T, uint N>
 void matrixBase<T,N>::setup(uint inDim0, uint inDim1, uint inDim2, uint inDim3)
 {
-  dims = {inDim0,inDim1,inDim2,inDim3};
+  dims = {{inDim0,inDim1,inDim2,inDim3}};
   data.resize(inDim0*inDim1*inDim2*inDim3);
 }
 
@@ -130,10 +130,10 @@ void matrix<T>::initializeToValue(T val)
 //  data.insert(data.begin()+rowNum,vec.begin(),1);
 
 //  if (dims[0] == 0) {
-//    dims = {1,1,1,1};
+//    dims = {{1,1,1,1}};
 //  }
 //  else {
-//    dims = {dims[0]+1,1,1,1};
+//    dims = {{dims[0]+1,1,1,1}};
 //  }
 //}
 template<typename T, uint N>
@@ -194,7 +194,7 @@ void matrix<T>::insertRow(T *vec, uint rowNum, uint length)
   }
 
   if (this->dims[0]==0)
-    this->dims = {0,length,1,1};
+    this->dims = {{0,length,1,1}};
 
   this->dims[0]++;
 }
