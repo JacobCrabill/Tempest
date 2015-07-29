@@ -136,6 +136,30 @@ void matrix<T>::initializeToValue(T val)
 //    dims = {dims[0]+1,1,1,1};
 //  }
 //}
+template<typename T, uint N>
+void matrixBase<T,N>::insertRow(const vector<T> &vec, int rowNum)
+{
+  if (N!=2)
+    FatalError("InsertRow only supported for 2D arrays.");
+
+  if (this->dims[1]!= 0 && vec.size()!=this->dims[1])
+    FatalError("Attempting to assign row of wrong size to matrix.");
+
+  if (rowNum==INSERT_AT_END || rowNum==(int)this->dims[0]) {
+    // Default action - add to end
+    this->data.insert(this->data.end(),vec.begin(),vec.end());
+  }else{
+    // Insert at specified location
+    this->data.insert(this->data.begin()+rowNum*this->dims[1],vec.begin(),vec.end());
+  }
+
+  if (this->dims[1]==0) {
+    this->dims[1] = vec.size(); // This may not be needed (i.e. may never have dim1==0). need to verify how I set up dim0, dim1...
+    this->dims[2] = 1;
+    this->dims[3] = 1;
+  }
+  this->dims[0]++;
+}
 
 template<typename T>
 void matrix<T>::insertRow(const vector<T> &vec, int rowNum)

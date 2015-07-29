@@ -315,13 +315,12 @@ void solver::calcFluxDivergence(int step)
 {
 #pragma omp parallel for
   for (int i=0; i<nVerts; i++) {
-    if (!Geo->v2b[i]) {
-      for (int k=0; k<nFields; k++) divF(step,i,k) = 0;
+    //if (Geo->v2b[i]) continue;
+    for (int k=0; k<nFields; k++) divF(step,i,k) = 0;
 
-      for (int j=0; j<v2ne[i]; j++) {
-        for (int k=0; k<nFields; k++) {
-          divF(step,i,k) += Fn(v2e(i,j),k)*A(i,j)*normDir(i,j);
-        }
+    for (int j=0; j<v2ne[i]; j++) {
+      for (int k=0; k<nFields; k++) {
+        divF(step,i,k) += Fn(v2e(i,j),k)*A(i,j)*normDir(i,j);
       }
     }
   }
@@ -348,7 +347,7 @@ void solver::calcDt(void)
 
 #pragma omp parallel for reduction(min:dt)
   for (int i=0; i<nVerts; i++) {
-    if (Geo->v2b[i]) continue;
+    //if (Geo->v2b[i]) continue;
 
     double rho = U(i,0);
     double rhovMagSq = U(i,1)*U(i,1) + U(i,2)*U(i,2);
@@ -378,7 +377,7 @@ void solver::timeStepA(int step)
 {
 #pragma omp parallel for
   for (int i=0; i<nVerts; i++) {
-    if (Geo->v2b[i]) continue;
+    //if (Geo->v2b[i]) continue;
     for (int j=0; j<nFields; j++) {
       U(i,j) = U0(i,j) - RKa[step]*params->dt*divF(step,i,j)/vol[i];
     }
@@ -390,7 +389,7 @@ void solver::timeStepB(int step)
 {
 #pragma omp parallel for
   for (int i=0; i<nVerts; i++) {
-    if (Geo->v2b[i]) continue;
+    //if (Geo->v2b[i]) continue;
     for (int j=0; j<nFields; j++) {
       U(i,j) -= RKb[step]*params->dt*divF(step,i,j)/vol[i];
     }

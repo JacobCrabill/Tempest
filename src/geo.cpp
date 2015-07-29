@@ -682,81 +682,136 @@ void geo::processConnDual(void)
   /* --- Setup Dual Mesh Faces --- */
 
   e2A.resize(nEdges);
+  v2vol.assign(nVerts,0);
   for (int i=0; i<nEdges; i++) {
     point midPt = (point(xv[e2v(i,0)])+point(xv[e2v(i,1)]))/2.;
-    vector<point> facePts(e2nc[i]);
+
+    Array<point,2> facePts;
 
     // Get the 'edges' of the dual-mesh face
     // Use similar concept to getting e2v: get unique 'edges' by putting lower
     // cell ID first
-    matrix<int> dualEdges(e2nc[i],2); // each 'edge' of the dual face (neighboring cell IDs)
-    int nmatched = 0;
-    for (int j=0; j<e2nc[i]; j++) {
-      int ic = e2c(i,j);
-      // To find dual edge, find cells adjacent to current cell which also share mesh edge
-      for (int k=0; k<c2nf[ic]; k++) {
-        int ic2 = c2c(ic,k);
-        // see if this c2c is another cell for this edge
-        if (ic2>ic && findFirst(e2c[i],ic2,e2nc[i]) != -1) {
-          dualEdges(nmatched,0) = ic;
-          dualEdges(nmatched,1) = ic2;
-          nmatched++;
+//    if (isBndEdge[i]) {
+      // Have to do some special logic to get face-centers of boundary faces
+//      int nmatched = 0;
+      for (int j=0; j<e2nc[i]; j++) {
+        int ic = e2c(i,j);
+        for (int k=0; k<c2nf[ic]; k++) {
+          if (c2b(ic,k)) {
+            // To find dual edge, find correct face of boundary cells to get face center
+            // Only look at boundary faces
+            int ff = c2f(ic,k);
+            int nepts = 0;
+            // Check face's points to find edge
+            for (int m=0; m<f2nv[ff]; m++)
+              if (f2v(ff,m) == e2v(i,0) || f2v(ff,m) == e2v(i,1))
+                nepts++;
+
+            if (nepts==2) {
+              // Edge is part of this face; dual edge is cell-center to face-center
+              point pt1 = c2xc[ic];
+              point pt2;
+              for (int n=0; n<f2nv[ff]; n++) pt2 += point(xv[f2v(ff,n)]);
+              pt2 /= f2nv[ff];
+              facePts.insertRow({pt1,pt2},INSERT_AT_END);
+            }
+          }
+          else {
+            int ic2 = c2c(ic,k);
+            // see if this c2c is another cell for this edge
+            if (ic2>ic && findFirst(e2c[i],ic2,e2nc[i]) != -1) {
+              facePts.insertRow({c2xc[ic],c2xc[ic2]},INSERT_AT_END);
+            }
+          }
         }
       }
-      facePts[j] = c2xc[e2c(i,j)];
-    }
+//    }
+//    else {
+//      // each 'edge' of the dual face (neighboring cell centers)
+//      facePts.setup(e2nc[i],2);
+//      int nmatched = 0;
+//      for (int j=0; j<e2nc[i]; j++) {
+//        int ic = e2c(i,j);
+//        // To find dual edge, find cells adjacent to current cell which also share mesh edge
+//        for (int k=0; k<c2nf[ic]; k++) {
+//          int ic2 = c2c(ic,k);
+//          // see if this c2c is another cell for this edge
+//          if (ic2>ic && findFirst(e2c[i],ic2,e2nc[i]) != -1) {
+//            facePts(nmatched,0) = c2xc[ic];
+//            facePts(nmatched,1) = c2xc[ic2];
+//            nmatched++;
+//          }
+//        }
+//      }
 
-    // Get area of dual face
-    for (int j=0; j<e2nc[i]; j++) {
-      Vec3 dx1 = c2xc[dualEdges(j,0)] - midPt;
-      Vec3 dx2 = c2xc[dualEdges(j,1)] - midPt;
-      Vec3 A = dx1.cross(dx2)/2.;
-      e2A[i] += A.norm();
-    }
+      // Get area of dual face
+      for (int j=0; j<facePts.getDim0(); j++) {
+        Vec3 dx1 = facePts(j,0) - midPt;
+        Vec3 dx2 = facePts(j,1) - midPt;
+        Vec3 A = dx1.cross(dx2)/2.;
+        e2A[i] += A.norm();
+      }
+
+      // Add to volumes around edge's points
+      // Have the dual-mesh-face edges; get the dual-tet volumes
+      // http://mathworld.wolfram.com/Tetrahedron.html
+
+      for (int j=0; j<2; j++) {
+        int iv = e2v(i,j);
+        point vert = point(xv[iv]);
+        Vec3 a = midPt - vert;
+        for (int j=0; j<facePts.getDim0(); j++) {
+          Vec3 b = facePts(j,0) - vert;
+          Vec3 c = facePts(j,1) - vert;
+          Vec3 bc = b.cross(c);
+          double vol = std::abs(a*bc)/6.;
+          v2vol[iv] += vol;
+        }
+      }
   }
 
 
   /* --- Get Volumes of Dual-Mesh Elements --- */
 
-  v2vol.assign(nVerts,0);
-  for (int iv=0; iv<nVerts; iv++) {
-    point vert = point(xv[iv]);
+//  v2vol.assign(nVerts,0);
+//  for (int iv=0; iv<nVerts; iv++) {
+//    point vert = point(xv[iv]);
 
-    // Sum up contributions from each dual tetrahedron around each edge
-    for (int j=0; j<v2nv[iv]; j++) {
-      int ie = v2e(iv,j);
-      // Get the 'edges' of the dual-mesh face
-      matrix<int> dualEdges(e2nc[ie],2); // each 'edge' of the dual face (neighboring cell IDs)
-      int nmatched = 0;
-      for (int k=0; k<e2nc[ie]; k++) {
-        int ic = e2c(ie,k);
-        // To find dual edge, find cells adjacent to current cell which also share mesh edge
-        for (int k=0; k<c2nf[ic]; k++) {
-          int ic2 = c2c(ic,k);
-          // see if this c2c is another cell for this edge
-          if (ic2>ic && findFirst(e2c[ie],ic2,e2nc[ie]) != -1) {
-            dualEdges(nmatched,0) = ic;
-            dualEdges(nmatched,1) = ic2;
-            nmatched++;
-          }
-        }
-      }
+//    // Sum up contributions from each dual tetrahedron around each edge
+//    for (int j=0; j<v2nv[iv]; j++) {
+//      int ie = v2e(iv,j);
+//      // Get the 'edges' of the dual-mesh face
+//      matrix<int> dualEdges(e2nc[ie],2); // each 'edge' of the dual face (neighboring cell IDs)
+//      int nmatched = 0;
+//      for (int k=0; k<e2nc[ie]; k++) {
+//        int ic = e2c(ie,k);
+//        // To find dual edge, find cells adjacent to current cell which also share mesh edge
+//        for (int k=0; k<c2nf[ic]; k++) {
+//          int ic2 = c2c(ic,k);
+//          // see if this c2c is another cell for this edge
+//          if (ic2>ic && findFirst(e2c[ie],ic2,e2nc[ie]) != -1) {
+//            dualEdges(nmatched,0) = ic;
+//            dualEdges(nmatched,1) = ic2;
+//            nmatched++;
+//          }
+//        }
+//      }
 
-      // Have the dual-mesh-face edges; get the dual-tet volumes
-      // http://mathworld.wolfram.com/Tetrahedron.html
+//      // Have the dual-mesh-face edges; get the dual-tet volumes
+//      // http://mathworld.wolfram.com/Tetrahedron.html
 
-      point midPt = (point(xv[e2v(ie,0)])+point(xv[e2v(ie,1)]))/2.;
-      Vec3 a = midPt - vert;
+//      point midPt = (point(xv[e2v(ie,0)])+point(xv[e2v(ie,1)]))/2.;
+//      Vec3 a = midPt - vert;
 
-      for (int k=0; k<e2nc[ie]; k++) {
-        Vec3 b = c2xc[dualEdges(k,0)] - vert;
-        Vec3 c = c2xc[dualEdges(k,1)] - vert;
-        Vec3 bc = b.cross(c);
-        double vol = std::abs(a*bc)/6.;
-        v2vol[iv] += vol;
-      }
-    }
-  }
+//      for (int k=0; k<e2nc[ie]; k++) {
+//        Vec3 b = c2xc[dualEdges(k,0)] - vert;
+//        Vec3 c = c2xc[dualEdges(k,1)] - vert;
+//        Vec3 bc = b.cross(c);
+//        double vol = std::abs(a*bc)/6.;
+//        v2vol[iv] += vol;
+//      }
+//    }
+//  }
 
   /* --- Get Boundary-Point Normals ---- */
 
@@ -1604,7 +1659,7 @@ void geo::createMesh()
     nFacesPerBnd[ib] = ne;
   }
   else if (nDims == 3) {
-    // Bottom Side Faces
+    // Bottom Side Faces  [zmin]
     int ib = bc2bcList[bcStr2Num[params->create_bcBottom]];
     int nf = nFacesPerBnd[ib];
     for (int ix=0; ix<nx; ix++) {
@@ -1618,7 +1673,7 @@ void geo::createMesh()
     }
     nFacesPerBnd[ib] = nf;
 
-    // Top Side Faces
+    // Top Side Faces  [zmax]
     ib = bc2bcList[bcStr2Num[params->create_bcTop]];
     nf = nFacesPerBnd[ib];
     for (int ix=0; ix<nx; ix++) {
@@ -1661,8 +1716,8 @@ void geo::createMesh()
     nFacesPerBnd[ib] = nf;
 
 
-    // Back Side Faces (y = ymin)
-    ib = bc2bcList[bcStr2Num[params->create_bcBack]];
+    // Front Side Faces (y = ymin)
+    ib = bc2bcList[bcStr2Num[params->create_bcFront]];
     nf = nFacesPerBnd[ib];
     for (int iz=0; iz<nz; iz++) {
       for (int ix=0; ix<nx; ix++) {
@@ -1675,8 +1730,8 @@ void geo::createMesh()
     }
     nFacesPerBnd[ib] = nf;
 
-    // Front Side Faces (y = ymax)
-    ib = bc2bcList[bcStr2Num[params->create_bcFront]];
+    // Back Side Faces (y = ymax)
+    ib = bc2bcList[bcStr2Num[params->create_bcBack]];
     nf = nFacesPerBnd[ib];
     for (int iz=0; iz<nz; iz++) {
       for (int ix=0; ix<nx; ix++) {
