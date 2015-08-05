@@ -486,6 +486,24 @@ void solver::initializeSolution()
     case 1: // Isentropic Vortex test case
       // Grab from HiFiLES or Flurry
       break;
+
+    case 2: // Fake shock tube
+      if (xv(i,2) > 0) {
+        U(i,0) = 10;
+        U(i,1) = 0;
+        U(i,2) = 0;
+        U(i,3) = 0;
+        U(i,4) = 1000;
+      }
+      else {
+        U(i,0) = .1;
+        U(i,1) = 0;
+        U(i,2) = 0;
+        U(i,3) = 0;
+        U(i,4) = 10;
+      }
+      break;
+
     }
   }
 

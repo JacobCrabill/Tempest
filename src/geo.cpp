@@ -586,10 +586,10 @@ void geo::processConnFaces(void)
       int ff = bcFaceList[bnd][i];
       switch (f2nv[ff]) {
       case 3:
-        bcFaceNorm(bnd,i) = getFaceNormalTri(ff);
+        bcFaceNorm(bnd,i) = getFaceNormalTri(ff)/3.;
         break;
       case 4:
-        bcFaceNorm(bnd,i) = getFaceNormalQuad(ff);
+        bcFaceNorm(bnd,i) = getFaceNormalQuad(ff)/4.;
         break;
       default:
         FatalError("Number of face vertices not recognized.");
