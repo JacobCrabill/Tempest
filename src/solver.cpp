@@ -200,6 +200,7 @@ void solver::setupDualMesh(void) {
   vol = Geo->v2vol;
   bcList = Geo->bcList;
   bndNorm = Geo->bndNorm;
+  bndArea = Geo->bndArea;
   bndPts = Geo->bndPts;
   nBndPts = Geo->nBndPts;
 
@@ -315,12 +316,25 @@ void solver::calcFluxDivergence(int step)
 {
 #pragma omp parallel for
   for (int i=0; i<nVerts; i++) {
-    if (!Geo->v2b[i]) {
-      for (int k=0; k<nFields; k++) divF(step,i,k) = 0;
+    //if (Geo->v2b[i]) continue;
+    for (int k=0; k<nFields; k++) divF(step,i,k) = 0;
 
-      for (int j=0; j<v2ne[i]; j++) {
+    for (int j=0; j<v2ne[i]; j++) {
+      for (int k=0; k<nFields; k++) {
+        divF(step,i,k) += Fn(v2e(i,j),k)*A(i,j)*normDir(i,j);
+      }
+    }
+  }
+
+  matrix<double> tmpF(nDims,nFields);
+#pragma omp parallel for collapse(2)
+  for (int ib=0; ib<nBounds; ib++) {
+    for (int i=0; i<nBndPts[ib]; i++) {
+      int iv = bndPts(ib,i);
+      inviscidFlux(U[iv],tmpF,params);
+      for (int dim=0; dim<nDims; dim++) {
         for (int k=0; k<nFields; k++) {
-          divF(step,i,k) += Fn(v2e(i,j),k)*A(i,j)*normDir(i,j);
+          divF(step,iv,k) += tmpF(dim,k)*bndNorm(ib,i)[dim]*bndArea(ib,i);
         }
       }
     }
@@ -348,7 +362,7 @@ void solver::calcDt(void)
 
 #pragma omp parallel for reduction(min:dt)
   for (int i=0; i<nVerts; i++) {
-    if (Geo->v2b[i]) continue;
+    //if (Geo->v2b[i]) continue;
 
     double rho = U(i,0);
     double rhovMagSq = U(i,1)*U(i,1) + U(i,2)*U(i,2);
@@ -378,7 +392,7 @@ void solver::timeStepA(int step)
 {
 #pragma omp parallel for
   for (int i=0; i<nVerts; i++) {
-    if (Geo->v2b[i]) continue;
+    //if (Geo->v2b[i]) continue;
     for (int j=0; j<nFields; j++) {
       U(i,j) = U0(i,j) - RKa[step]*params->dt*divF(step,i,j)/vol[i];
     }
@@ -390,7 +404,7 @@ void solver::timeStepB(int step)
 {
 #pragma omp parallel for
   for (int i=0; i<nVerts; i++) {
-    if (Geo->v2b[i]) continue;
+    //if (Geo->v2b[i]) continue;
     for (int j=0; j<nFields; j++) {
       U(i,j) -= RKb[step]*params->dt*divF(step,i,j)/vol[i];
     }
@@ -472,6 +486,24 @@ void solver::initializeSolution()
     case 1: // Isentropic Vortex test case
       // Grab from HiFiLES or Flurry
       break;
+
+    case 2: // Fake shock tube
+      if (xv(i,2) > 0) {
+        U(i,0) = 10;
+        U(i,1) = 0;
+        U(i,2) = 0;
+        U(i,3) = 0;
+        U(i,4) = 1000;
+      }
+      else {
+        U(i,0) = .1;
+        U(i,1) = 0;
+        U(i,2) = 0;
+        U(i,3) = 0;
+        U(i,4) = 10;
+      }
+      break;
+
     }
   }
 

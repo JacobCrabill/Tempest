@@ -167,7 +167,7 @@ public:
 
   matrix<double> U;    //! Global solution array for solver (at vertices)
   matrix<double> U0;   //! Global solution array at beginning of RK step
-  matrix<double> A;    //! Area of dual-mesh faces around each vertex 
+  matrix<double> A;    //! Area of dual-mesh faces around each vertex
   vector<double> vol;  //! Volume of dual-mesh elements
   Array<double,3> F;   //! Global flux array for solver (at edges)
   matrix<double> Fn;   //! Global normal flux array for solver (at edges)
@@ -191,6 +191,7 @@ public:
   vector<int> nBndPts;  //! List of boundary nodes on each boundary
   //vector<int> bcType;  //! Boundary condition for each boundary node
   Array<Vec3,2> bndNorm;  //! Unit normal at all boundary nodes
+  matrix<double> bndArea; //! Face area at all boundary nodes
 
   /* ---- Overset Grid Variables / Functions ---- */
 

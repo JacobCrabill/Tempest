@@ -67,6 +67,8 @@ public:
 
   void setup(uint inDim0, uint inDim1=1, uint inDim2=1, uint inDim3=1);
 
+  void insertRow(const vector<T> &vec, int rowNum);
+
   /*! Prints the contents of the matrix to the console */
   void print(void);
 

@@ -210,17 +210,22 @@ void writeParaview(solver *Solver, geo* Geo, input *params)
 
   if (params->equation == NAVIER_STOKES) {
     /* --- Velocity --- */
-    dataFile << "				<DataArray type=\"Float32\" NumberOfComponents=\"3\" Name=\"Momentum\" format=\"ascii\">" << endl;
+    dataFile << "				<DataArray type=\"Float32\" NumberOfComponents=\"3\" Name=\"Velocity\" format=\"ascii\">" << endl;
     for(int i=0; i<Solver->nVerts; i++) {
-      dataFile << Solver->U(i,1) << " " << Solver->U(i,2) << " " << Solver->U(i,3) << " ";
+      dataFile << Solver->U(i,1)/Solver->U(i,0) << " " << Solver->U(i,2)/Solver->U(i,0) << " " << Solver->U(i,3)/Solver->U(i,0) << " ";
     }
     dataFile << endl;
     dataFile << "				</DataArray>" << endl;
 
     /* --- Pressure --- */
-    dataFile << "				<DataArray type=\"Float32\" Name=\"Energy\" format=\"ascii\">" << endl;
+    dataFile << "				<DataArray type=\"Float32\" Name=\"Pressure\" format=\"ascii\">" << endl;
     for(int i=0; i<Solver->nVerts; i++) {
-      dataFile << Solver->U(i,params->nDims+1) << " ";
+      double rho = Solver->U(i,0);
+      double u = Solver->U(i,1)/rho;
+      double v = Solver->U(i,2)/rho;
+      double w = Solver->U(i,3)/rho;
+      double p = (params->gamma-1)*(Solver->U(i,4) - 0.5*rho*(u*u+v*v+w*w));
+      dataFile << p << " ";
     }
     dataFile << endl;
     dataFile << "				</DataArray>" << endl;
