@@ -322,7 +322,6 @@ void writeResidual(solver *Solver, input *params)
 
   if (params->resType == 3) {
     // Infinity Norm
-#pragma omp parallel for
     for (uint iv=0; iv<Solver->nVerts; iv++) {
       if (Solver->Geo->v2b[iv]) continue;
       for (int i=0; i<params->nFields; i++) {
@@ -335,7 +334,6 @@ void writeResidual(solver *Solver, input *params)
   }
   else if (params->resType == 1) {
     // 1-Norm
-#pragma omp parallel for
     for (uint iv=0; iv<Solver->nVerts; iv++) {
       if (Solver->Geo->v2b[iv]) continue;
       for (int i=0; i<params->nFields; i++) {
@@ -348,7 +346,6 @@ void writeResidual(solver *Solver, input *params)
   }
   else if (params->resType == 2) {
     // 2-Norm
-#pragma omp parallel for
     for (uint iv=0; iv<Solver->nVerts; iv++) {
       if (Solver->Geo->v2b[iv]) continue;
       for (int i=0; i<params->nFields; i++) {
